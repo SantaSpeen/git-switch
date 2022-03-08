@@ -1,0 +1,4 @@
+GitPython==3.1.27
+pygit2==1.9.0
+PyGithub==1.55
+requests==2.27.1
