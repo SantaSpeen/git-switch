@@ -4,10 +4,8 @@ import json
 
 import argparse
 import sys
-from typing import List
 
 from github import Github
-import pygit2
 
 from git import Repo
 
