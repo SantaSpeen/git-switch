@@ -163,6 +163,11 @@ def clone_repos(repos,
                 },
                 data=json.dumps(json_data)
             )
+
+            if gitflic_repo.status_code == 429:
+                logger.info(f'Request limit exceeded.')
+                sys.exit()
+
         except Exception:
             logger.info(f'Error while creating repository on gitflic.')
             continue
