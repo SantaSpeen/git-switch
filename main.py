@@ -3,6 +3,7 @@ import glob
 import json
 
 import argparse
+import sys
 from typing import List
 
 from github import Github
@@ -19,6 +20,9 @@ logger.setLevel(logging.INFO)
 fh = logging.FileHandler('repos_log.log')
 fh.setLevel(logging.INFO)
 logger.addHandler(fh)
+
+console = logging.StreamHandler(sys.stdout)
+logging.getLogger().addHandler(console)
 
 
 def parse_args():
@@ -98,7 +102,6 @@ def clone_repos(repos,
     :return:
     """
 
-    callbacks = pygit2.RemoteCallbacks(pygit2.UserPass(token, 'x-oauth-basic'))
     github_clonned = ''
 
     if os.path.exists("github_clonned.txt"):
@@ -108,8 +111,6 @@ def clone_repos(repos,
 
     file = open("github_clonned.txt", "a+")
 
-
-
     for i, repo in enumerate(repos):
         id = repo.id
         name = repo.name
@@ -118,6 +119,7 @@ def clone_repos(repos,
         description = get_description(repo)
         language = repo.language
 
+        logger.info(f'\nCopying {name}:')
 
         if str(id) in github_clonned:
             logger.info(f'Repository {org}/{name} already copied')
@@ -125,45 +127,68 @@ def clone_repos(repos,
 
         if is_private is not None:
             if is_private.lower() == 'true' and not private:
+                logger.info('Repository is public, skipping...')
                 continue
 
             if is_private.lower() == 'false' and private:
+                logger.info('Repository is private, skipping...')
                 continue
 
+        try:
+            logger.info(f'Creating directory to copy.')
+            local_path = os.path.join(dst_dir, org, name)
+            os.makedirs(local_path)
+            authed_clone_url = insert_token(repo.clone_url, token)
+
+            logger.info(f'Cloning: {org}/{name} into {local_path}')
+            github_repo = Repo.clone_from(authed_clone_url, local_path)
+        except Exception:
+            logger.info(f'Error copying repository from github. Probably repository has already been copied locally.')
+            continue
+
         json_data = {
-                   "title": f"{org}-{name}",
-                   "description": f"{description}",
-                   "alias": f"{org}-{name}",
-                   "language": f"{language}",
-                   "private": "true"
-               }
+            "title": f"{org}-{name}",
+            "description": f"{description}",
+            "alias": f"{org}-{name}",
+            "language": f"{language}",
+            "private": "true"
+        }
 
-        # Создаем репозиторий на гитфлике
-        gitflic_repo = requests.post(
-            'http://localhost:8047/project',
-            headers = {
-                "Authorization": f"token {gitflic_token}",
-                "Content-Type": "application/json"
-            },
-            data = json.dumps(json_data)
-        )
-
-        gitflic_url = gitflic_repo.json().get("sshTransportUrl")
-
-        local_path = os.path.join(dst_dir, org, name)
-        os.makedirs(local_path)
-        authed_clone_url = insert_token(repo.clone_url, token)
-
-        logger.info(f'Cloning: {org}/{name} into {local_path}')
-        github_repo = Repo.clone_from(authed_clone_url, local_path)
-        remote = github_repo.create_remote("gitflic", url = gitflic_url)
-        remote.push(refspec='--all')
-
-        file.write(str(id) + '\n')
+        try:
+            logger.info(f'Creating repository {org}-{name} on gitflic.')
+            # Создаем репозиторий на гитфлике
+            gitflic_repo = requests.post(
+                'http://localhost:8047/project',
+                headers={
+                    "Authorization": f"token {gitflic_token}",
+                    "Content-Type": "application/json"
+                },
+                data=json.dumps(json_data)
+            )
+        except Exception:
+            logger.info(f'Error while creating repository on gitflic.')
+            continue
 
 
-def upload_repos(local_repos: List[str]):
-    raise NotImplementedError
+        try:
+            logger.info(f'Geting ssh link to repository...')
+            gitflic_url = gitflic_repo.json().get("sshTransportUrl")
+
+            logger.info(f'Establishing a connection to the repository...')
+            remote = github_repo.create_remote("gitflic", url = gitflic_url)
+        except Exception:
+            logger.info(f'Error creating connection to gitflic repository.')
+            continue
+
+        try:
+            logger.info(f'Pushing files into repository...')
+            remote.push(refspec='--all')
+
+            file.write(str(id) + '\n')
+            logger.info(f'Repository {org}-{name} successfully cloned.')
+        except Exception:
+            logger.info(f'Error while pushing files into gitflic repository.')
+            continue
 
 
 if __name__ == '__main__':
@@ -180,14 +205,12 @@ if __name__ == '__main__':
 
     for i, repo in enumerate(repos):
         logger.info('Existing repos:')
-        logger.info(f'ORG: {get_org_name(repo)} - REPO: {repo.name}')
+        logger.info(f'ORG: {get_org_name(repo)} - REPO: {repo.name}\n')
 
     clone_repos(repos, token, dst_folder, gitflic_token, is_private)
 
     local_repos = glob.glob(dst_folder + '/*/*')
     # all repos are cloned
     assert i + 1 == len(local_repos)
-
-    upload_repos(local_repos)
 
 
