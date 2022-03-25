@@ -12,6 +12,7 @@ from git import Repo
 import requests
 
 import logging
+
 logger = logging.getLogger('log')
 logger.setLevel(logging.INFO)
 
@@ -76,6 +77,7 @@ def get_org_name(repo):
         return 'default'
     return repo.organization.login
 
+
 def get_description(repo):
     """
     Parses description from a repo object.
@@ -87,13 +89,15 @@ def get_description(repo):
         return ''
     return repo.organization.description
 
+
 def clone_repos(repos,
                 token: str,
                 dst_dir: str,
                 gitflic_token: str,
-                is_private: bool):
+                is_private: str):
     """
     Clone all repos(private and public) of a token holder.
+    :param is_private:
     :param repos: GitHub repositories
     :param token: GitHub access token
     :param dst_dir: directory to clone repos into
@@ -172,13 +176,12 @@ def clone_repos(repos,
             logger.info(f'Error while creating repository on gitflic.')
             continue
 
-
         try:
             logger.info(f'Geting ssh link to repository...')
             gitflic_url = gitflic_repo.json().get("sshTransportUrl")
 
             logger.info(f'Establishing a connection to the repository...')
-            remote = github_repo.create_remote("gitflic", url = gitflic_url)
+            remote = github_repo.create_remote("gitflic", url=gitflic_url)
         except Exception:
             logger.info(f'Error creating connection to gitflic repository.')
             continue
@@ -197,24 +200,21 @@ def clone_repos(repos,
 if __name__ == '__main__':
     args = parse_args()
 
-    token = args.token
+    github_token = args.token
     gitflic_token = args.gitflic_token
     dst_folder = args.dst_folder
     is_private = args.is_private
 
-    g = Github(token)
+    g = Github(github_token)
     user = g.get_user()
-    repos = user.get_repos()
+    github_repos = user.get_repos()
 
-    i = 0
     logger.info('Existing repos:')
-    for i, repo in enumerate(repos):
+    for repo in github_repos:
         logger.info(f'ORG: {get_org_name(repo)} - REPO: {repo.name}')
 
-    clone_repos(repos, token, dst_folder, gitflic_token, is_private)
+    clone_repos(github_repos, github_token, dst_folder, gitflic_token, is_private)
 
     local_repos = glob.glob(dst_folder + '/*/*')
     # all repos are cloned
-    assert i + 1 == len(local_repos)
-
-
+    assert github_repos.totalCount == len(local_repos)
