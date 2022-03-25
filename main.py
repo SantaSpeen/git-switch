@@ -154,7 +154,7 @@ def clone_repos(repos,
 
         try:
             logger.info(f'Creating repository {org}-{name} on gitflic.')
-            # Создаем репозиторий на гитфлике
+            # Создаём репозиторий на гитфлике
             gitflic_repo = requests.post(
                 'http://localhost:8047/project',
                 headers={
@@ -206,9 +206,10 @@ if __name__ == '__main__':
     user = g.get_user()
     repos = user.get_repos()
 
+    i = 0
+    logger.info('Existing repos:')
     for i, repo in enumerate(repos):
-        logger.info('Existing repos:')
-        logger.info(f'ORG: {get_org_name(repo)} - REPO: {repo.name}\n')
+        logger.info(f'ORG: {get_org_name(repo)} - REPO: {repo.name}')
 
     clone_repos(repos, token, dst_folder, gitflic_token, is_private)
 
