@@ -71,6 +71,7 @@ class GitSwitch:
         self.github_repos = self.gh_user.get_repos()
 
     def get_github_repo(self, repo_info) -> Union[Repo, None]:
+        """ Получаем репозиторий с GitHub """
         login = self.get_login(repo_info)
         name = repo_info.name
         path = os.path.join(self.clone_folder, login, name)
@@ -88,9 +89,11 @@ class GitSwitch:
         pass
 
     def push_into_gitflic(self, repo, url) -> bool:
-        return False
+        """ Пушим репозиторий на GitFlic """
+        pass
 
-    def clone(self):
+    def run(self):
+        """ Запуск основной части """
         for repo_info in self.github_repos:
             github_repo = self.get_github_repo(repo_info)
             if not github_repo: continue
@@ -111,7 +114,7 @@ class GitSwitch:
             log.info("Stopped by the user.")
             exit(0)
 
-        self.clone()
+        self.run()
 
 
 # Инициализируем наши аргументы
