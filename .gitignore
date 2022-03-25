@@ -107,3 +107,6 @@ GitHub.sublime-settings
 
 # Idea #
 .idea/
+
+# Cloned repos
+cloned-repos/
