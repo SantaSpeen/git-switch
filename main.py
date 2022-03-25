@@ -7,21 +7,23 @@
     Программа была отрефакторена: @SantaSpeen
 """
 
+# Типы. Используется для <того, что бы тебя любило IDE>.
+from typing import NoReturn, Union
+
 # Удобная и встроенная в Python библиотека логирования. Подробнее: https://docs.python.org/3.10/library/logging.html
 import logging
+# Встроенные библиотеки. Нужны для некоторых функций прогрммы.
 import os
 import sys
 import time
 
 # Библиотека для работы с аргументами. Подробнее: https://click.palletsprojects.com/en/8.0.x
-from typing import NoReturn, Union
-
 import click
-# Библиотека для работы c GitHub API
+# Библиотека для работы c GitHub API. Подробнее: https://github.com/PyGithub/PyGithub
 from github import Github, AuthenticatedUser, PaginatedList
-# Библиотека для работы с Gitflic API
+# Библиотека для работы с Gitflic API. Подробнее: https://github.com/SantaSpeen/gitflic
 from gitflic import GitflicAuth, Gitflic
-# Библиотека для работы с git
+# Библиотека для работы с git. Подробнее про систему git: https://habr.com/ru/post/588801/
 from git import Repo
 
 
