@@ -1,220 +1,132 @@
+# -*- coding: utf-8 -*-
+
+# noinspection GrazieInspection
+"""
+    Программа для клонирования репозиториев с https://github.com/ на https://gitflic.ru
+    Программа была написана: @dikola
+    Программа была отрефакторена: @SantaSpeen
+"""
+
+# Удобная и встроенная в Python библиотека логирования. Подробнее: https://docs.python.org/3.10/library/logging.html
+import logging
 import os
-import glob
-import json
-
-import argparse
 import sys
+import time
 
-from github import Github
+# Библиотека для работы с аргументами. Подробнее: https://click.palletsprojects.com/en/8.0.x
+from typing import NoReturn, Union
 
+import click
+# Библиотека для работы c GitHub API
+from github import Github, AuthenticatedUser, PaginatedList
+# Библиотека для работы с Gitflic API
+from gitflic import GitflicAuth, Gitflic
+# Библиотека для работы с git
 from git import Repo
 
-import requests
 
-import logging
-logger = logging.getLogger('log')
-logger.setLevel(logging.INFO)
+# Инициализируем логирование
+log_format = "%(asctime)s - %(name)-5s - %(levelname)-5s - %(message)s"
+logging.basicConfig(level=logging.INFO,
+                    format=log_format)
+log = logging.getLogger(name="GitSwitch")
 
-fh = logging.FileHandler('repos_log.log')
+# Настройка логирование в файл.
+fh = logging.FileHandler('git-switch.log')
 fh.setLevel(logging.INFO)
-logger.addHandler(fh)
-
-console = logging.StreamHandler(sys.stdout)
-logging.getLogger().addHandler(console)
+fh.setFormatter(logging.Formatter(log_format))
+log.addHandler(fh)
 
 
-def parse_args():
-    """
-    Parses command line arguments.
+class GitSwitch:
 
-    :return:
-    """
-    parser = argparse.ArgumentParser()
+    # noinspection PyTypeChecker
+    def __init__(self, gf_token: str, gh_token: str, clone_folder: str, apply_private: bool, apply_organisations: bool):
+        self.gf_token = gf_token
+        self.gh_token = gh_token
 
-    parser.add_argument('--token', type=str,
-                        help='GitHub access token')
+        self.clone_folder = clone_folder
+        self.apply_private = apply_private
+        self.apply_organisations = apply_organisations
 
-    parser.add_argument('--gitflic_token', type=str,
-                        help='GitFlic access token')
+        self.gh: Gitflic = None
+        self.gf: Github = None
+        self.gh_user: AuthenticatedUser = None
 
-    parser.add_argument('--dst_folder', type=str, default='./cloned-repos',
-                        help='A folder to clone repositories into.')
+        self.github_repos: PaginatedList = None
 
-    parser.add_argument('--is_private', type=str,
-                        help='Sets the mode for copying repositories.'
-                             'True - copies only private repositories'
-                             'False - copies only public repositories')
-    return parser.parse_args()
+        self.get_login = lambda repo_info: repo_info.organization.login if repo_info.organization else self.gh_user.login
 
+    def authorization(self) -> NoReturn:
+        """ Авторизуемся и получаем список репозиториев с GitHub """
+        gf_session = GitflicAuth(self.gf_token)
+        self.gf = Gitflic(gf_session)
+        log.info(f"Logged into GitFlic as {self.gf.call('/user/me')['username']}")
+        self.gh = Github(self.gh_token)
+        self.gh_user = self.gh.get_user()
+        log.info(f"Logged into Github as {self.gh_user.login}")
 
-def insert_token(clone_url: str,
-                 token: str,
-                 proto='https://'):
-    """
-    Inserts a token into a repo address.
+        self.github_repos = self.gh_user.get_repos()
 
-    :param clone_url: url to insert token into
-    :param token: GitHub access token
-    :param proto: protocol
-    :return: clone_url with token inserted
-    """
-    assert clone_url.startswith(proto)
-    # "https://{token}@github.com/{username}/{repo}.git"
-    authed_clone_url = clone_url.replace(proto, proto + token + '@')
-    logger.info(f'Modified repo url: {authed_clone_url}')
-    return authed_clone_url
+    def get_github_repo(self, repo_info) -> Union[Repo, None]:
+        login = self.get_login(repo_info)
+        name = repo_info.name
+        path = os.path.join(self.clone_folder, login, name)
+        proto = "https://"
+        if not os.path.exists(path):
+            clone_url = repo_info.clone_url.replace(proto, proto + self.gh_token + '@')
+            log.info(f'Clone {login} : {name}; Clone path: {path};')
+            return Repo.clone_from(clone_url, path)
 
+        log.info(f"Path: {path} already exists.")
+        return None
 
-def get_org_name(repo):
-    """
-    Parses organization name from a repo object.
+    def get_gitflic_repo(self) -> Union[dict, None]:
+        """ Я хуй знает что тут писать. Какой нахуй localhost? Бесплатный блять host или чё? """
+        pass
 
-    :param repo: GitHub repository
-    :return: repo organization name if org is filled or 'default'
-    """
-    if not repo.organization:
-        return 'default'
-    return repo.organization.login
+    def push_into_gitflic(self, repo, url) -> bool:
+        return False
 
-def get_description(repo):
-    """
-    Parses description from a repo object.
+    def clone(self):
+        for repo_info in self.github_repos:
+            github_repo = self.get_github_repo(repo_info)
+            if not github_repo: continue
+            gitflic_repo = self.get_gitflic_repo()
+            if not gitflic_repo: continue
+            if self.push_into_gitflic(github_repo, gitflic_repo['sshTransportUrl']):
+                log.info(f"Repository {self.get_login(repo_info)}-{repo_info.name} successfully cloned.")
 
-    :param repo: GitHub repository
-    :return: repo empty description if description is empty
-    """
-    if not repo.organization:
-        return ''
-    return repo.organization.description
+    def start(self) -> NoReturn:
+        self.authorization()
 
-def clone_repos(repos,
-                token: str,
-                dst_dir: str,
-                gitflic_token: str,
-                is_private: bool):
-    """
-    Clone all repos(private and public) of a token holder.
-    :param repos: GitHub repositories
-    :param token: GitHub access token
-    :param dst_dir: directory to clone repos into
-    :return:
-    """
+        log.info("GitHub repositories:")
+        for repo in self.github_repos:
+            log.info(f'GitGub => {self.get_login(repo)} : {repo.name}')
+        log.info(f"Repositories found: {self.github_repos.totalCount}")
 
-    github_clonned = ''
+        if input("Do you agree to copying these repositories to GitFlic? (y/n) ").lower() != "y":
+            log.info("Stopped by the user.")
+            exit(0)
 
-    if os.path.exists("github_clonned.txt"):
-        file = open("github_clonned.txt", "r")
-        github_clonned = file.read()
-        file.close()
-
-    file = open("github_clonned.txt", "a+")
-
-    for i, repo in enumerate(repos):
-        id = repo.id
-        name = repo.name
-        private = repo.private
-        org = get_org_name(repo)
-        description = get_description(repo)
-        language = repo.language
-
-        logger.info(f'\nCopying {name}:')
-
-        if str(id) in github_clonned:
-            logger.info(f'Repository {org}/{name} already copied')
-            continue
-
-        if is_private is not None:
-            if is_private.lower() == 'true' and not private:
-                logger.info('Repository is public, skipping...')
-                continue
-
-            if is_private.lower() == 'false' and private:
-                logger.info('Repository is private, skipping...')
-                continue
-
-        try:
-            logger.info(f'Creating directory to copy.')
-            local_path = os.path.join(dst_dir, org, name)
-            os.makedirs(local_path)
-            authed_clone_url = insert_token(repo.clone_url, token)
-
-            logger.info(f'Cloning: {org}/{name} into {local_path}')
-            github_repo = Repo.clone_from(authed_clone_url, local_path)
-        except Exception:
-            logger.info(f'Error copying repository from github. Probably repository has already been copied locally.')
-            continue
-
-        json_data = {
-            "title": f"{org}-{name}",
-            "description": f"{description}",
-            "alias": f"{org}-{name}",
-            "language": f"{language}",
-            "private": "true"
-        }
-
-        try:
-            logger.info(f'Creating repository {org}-{name} on gitflic.')
-            # Создаём репозиторий на гитфлике
-            gitflic_repo = requests.post(
-                'http://localhost:8047/project',  # Это кто ??
-                headers={
-                    "Authorization": f"token {gitflic_token}",
-                    "Content-Type": "application/json"
-                },
-                data=json.dumps(json_data)
-            )
-
-            if gitflic_repo.status_code == 429:
-                logger.info(f'Request limit exceeded.')
-                sys.exit()
-
-        except Exception:
-            logger.info(f'Error while creating repository on gitflic.')
-            continue
+        self.clone()
 
 
-        try:
-            logger.info(f'Geting ssh link to repository...')
-            gitflic_url = gitflic_repo.json().get("sshTransportUrl")
+# Инициализируем наши аргументы
+@click.command()
+@click.option("--gf_token", help="Your GitFlic token.", type=str, required=True)
+@click.option("--gh_token", help="Your GitHub token.", type=str, required=True)
+@click.option("--clone_folder", help="Directory where to download repositories.", default="./cloned-repos", required=False)
+@click.option("--apply_private", help="Need to copy private repositories?", default=False, required=False)
+@click.option("--apply_organisations", help="Need to copy organisations repositories?", default=False, required=False)
+def main(**kwargs):
+    log.info("New log start.")
+    log.info(f"Local time: {time.asctime()}")
+    log.info(f"GitSwitch start with: {sys.argv} argumets.")
 
-            logger.info(f'Establishing a connection to the repository...')
-            remote = github_repo.create_remote("gitflic", url = gitflic_url)
-        except Exception:
-            logger.info(f'Error creating connection to gitflic repository.')
-            continue
-
-        try:
-            logger.info(f'Pushing files into repository...')
-            remote.push(refspec='--all')
-
-            file.write(str(id) + '\n')
-            logger.info(f'Repository {org}-{name} successfully cloned.')
-        except Exception:
-            logger.info(f'Error while pushing files into gitflic repository.')
-            continue
+    gs = GitSwitch(**kwargs)
+    gs.start()
 
 
 if __name__ == '__main__':
-    args = parse_args()
-
-    token = args.token
-    gitflic_token = args.gitflic_token
-    dst_folder = args.dst_folder
-    is_private = args.is_private
-
-    g = Github(token)
-    user = g.get_user()
-    repos = user.get_repos()
-
-    i = 0
-    logger.info('Existing repos:')
-    for i, repo in enumerate(repos):
-        logger.info(f'ORG: {get_org_name(repo)} - REPO: {repo.name}')
-
-    clone_repos(repos, token, dst_folder, gitflic_token, is_private)
-
-    local_repos = glob.glob(dst_folder + '/*/*')
-    # all repos are cloned
-    assert i + 1 == len(local_repos)
-
-
+    main()
