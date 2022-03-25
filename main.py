@@ -156,7 +156,7 @@ def clone_repos(repos,
             logger.info(f'Creating repository {org}-{name} on gitflic.')
             # Создаём репозиторий на гитфлике
             gitflic_repo = requests.post(
-                'http://localhost:8047/project',
+                'http://localhost:8047/project',  # Это кто ??
                 headers={
                     "Authorization": f"token {gitflic_token}",
                     "Content-Type": "application/json"
