@@ -8,7 +8,7 @@
 """
 
 # Типы. Используется для <того, что бы тебя любило IDE>.
-from typing import NoReturn, Union, Tuple
+from typing import NoReturn, Union
 
 # Удобная и встроенная в Python библиотека логирования. Подробнее: https://docs.python.org/3.10/library/logging.html
 import logging
