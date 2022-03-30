@@ -189,9 +189,13 @@ def main(**kwargs):
     log.info("New log start.")
     log.info(f"Local time: {time.asctime()}")
     log.info(f"GitSwitch start with: {sys.argv} argumets.")
-
-    gs = GitSwitch(**kwargs)
-    gs.start()
+    try:
+        gs = GitSwitch(**kwargs)
+        gs.start()
+    except Exception:
+        log.exception("GitSwitch send error:")
+    finally:
+        log.info(f"Exiting at {time.asctime()}\n{'-----'*20}")
 
 
 if __name__ == '__main__':
