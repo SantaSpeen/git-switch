@@ -181,10 +181,10 @@ class GitSwitch:
 @click.command()
 @click.option("--gf_token", help="Your GitFlic token.", type=str, required=True)
 @click.option("--gh_token", help="Your GitHub token.", type=str, required=True)
-@click.option("--clone_folder", help="Directory where to download repositories.", default="./cloned-repos", required=False)
 @click.option("--apply_private", help="Need to copy private repositories?", default=False, required=False)
 @click.option("--apply_organisations", help="Need to copy organisations repositories?", default=False, required=False)
 @click.option("--use_ssh", help="Use SSH mode to upload repositories.", default=False, required=False)
+@click.option("--clone_folder", help="Directory where to download repositories.", default="./cloned-repos", required=False)
 def main(**kwargs):
     log.info("New log start.")
     log.info(f"Local time: {time.asctime()}")
