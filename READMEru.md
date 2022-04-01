@@ -19,7 +19,7 @@ $ pip3 install -r requirements.txt
 Если у вас не установлен питон, скачайте с [http://python.org/](http://python.org/).\
 Актуально для windows.
 
-## Использывание 
+## Использование 
 
 ```shell
 # Shell
