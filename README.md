@@ -6,6 +6,8 @@
     <a href="https://gitflic.ru/user/santaspeen"><img src="https://img.santaspeen.ru/github/magic.svg" alt="magic"></a>
 </p>
 
+Russian localization: [here](https://gitflic.ru/project/dbi471/git-switch/blob?file=READMEru.md)
+
 A tool that will help you copy repositories from GitHub into GitFlic.
 
 ## Installation
